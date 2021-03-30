@@ -1,0 +1,27 @@
+{
+    "name": "pico",
+    "version": "1.0.0",
+    "description": "提供文件夹地址，整理其中照片归档：读取修改日期、MD5进行自动归档",
+    "main": "index.js",
+    "bin": {
+        "pico": "./dist/index.js"
+    },
+    "scripts": {
+        "start": "tsc && node ./dist/index.js",
+        "build": "tsc",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "commander": "^7.2.0",
+        "dayjs": "^1.10.4",
+        "moment": "^2.29.1"
+    },
+    "devDependencies": {
+        "@types/commander": "^2.12.2",
+        "@types/node": "^14.14.37",
+        "typescript": "^4.2.3"
+    }
+}
