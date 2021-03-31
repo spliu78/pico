@@ -54,3 +54,12 @@ testCommand.action(async (options) => {
 });
 
 program.parse();
+
+
+
+// (async () => {
+    // const picOpt: PicoOption = {};
+    // picOpt.mode = ClassifyWay.test;
+    // const p = new Pico('.', './test', picOpt);
+    // await p.process();
+// })();

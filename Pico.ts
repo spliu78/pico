@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import moment from 'moment';
 import { PathLike } from 'node:fs';
+import { MagicLog } from './util';
 const picExt = ['.gif', '.jpeg', '.jpg', '.png'];
 
 export enum ClassifyWay {
@@ -29,8 +30,8 @@ export interface Option {
 interface File {
     filePath: string,
     name: string,
-    time: moment.Moment,
-    hash: string
+    time?: moment.Moment,
+    hash?: string
 }
 
 export class Pico {
@@ -63,8 +64,10 @@ export class Pico {
     }
 
     public async process() {
-        // get files
+        // get files list
         await this.getFiles(this.inputDir);
+        // get files stat
+        await this.getFilesStat();
         // for (const file of this.files) {
         //     console.log(JSON.stringify(file, null, 2));
         // }
@@ -72,37 +75,43 @@ export class Pico {
         await this.classify();
         console.log('Job Done!');
     }
+
     public async classify() {
-        // 
+        console.log('Classify...');
         const fileSet = new Set();
         // classify by date
-        for (const file of this.files) {
+        for (let i = 0; i < this.files.length; i++) {
+            const file = this.files[i];
+            MagicLog.echo(`progress: ${i}/${this.files.length}\t Classify ${file.name}`);
+            if (!file.time || !file.hash) continue;
             if (fileSet.has(file.hash)) {
                 this.handleRepeatFile(file);
-                return;
+                continue;
             }
             fileSet.add(file.hash);
             const dirName = file.time.format('YYYY-MM-DD');
             const dirPath = path.join(this.outputDir, dirName);
-            console.log(`${file.filePath} will be copy to ${dirPath}`);
+            // console.log(`${file.filePath} will be copy to ${dirPath}`);
             if (this.option.mode === ClassifyWay.copy || this.option.mode === ClassifyWay.cut) {
                 await this.createDirIfNotExist(dirPath);
                 try {
                     await fsPromises.copyFile(file.filePath, path.join(dirPath, file.name), this.option.override ? undefined : fs.constants.COPYFILE_EXCL);
                     if (this.option.mode === ClassifyWay.cut) {
                         try {
-                            console.log(`${file.filePath} will be delete!`);
+                            // console.log(`${file.filePath} will be delete!`);
                             await fsPromises.rm(file.filePath);
                         } catch (e) {
-                            console.log(`${file.filePath} delete failed!`);
+                            // console.log(`${file.filePath} delete failed!`);
                         }
                     }
                 } catch (e) {
-                    console.log(`${file.filePath} copy failed!`);
+                    // console.log(`${file.filePath} copy failed!`);
                 }
             }
         }
+        MagicLog.newline();
     }
+
     public async createDirIfNotExist(dirPath: PathLike) {
         let dirStat;
         try {
@@ -113,10 +122,13 @@ export class Pico {
             await fsPromises.mkdir(dirPath, { recursive: true });
         }
     }
+
     public handleRepeatFile(file: File) {
-        console.log(`${file.name} hash repeat, skip`);
+        // console.log(`${file.name} hash repeat, skip`);
     }
+
     public async getFiles(dirPath: string) {
+        MagicLog.echo('Loading files... ');
         const files = await fsPromises.readdir(dirPath, { withFileTypes: true });
         for (const file of files) {
             const filePath = path.join(dirPath, file.name);
@@ -124,13 +136,27 @@ export class Pico {
                 await this.getFiles(filePath);
             } else if (file.isFile()) {
                 if (!this.ext.length || this.ext.includes(path.extname(file.name).toLowerCase())) {
-                    const time = await this.getDate(filePath);
-                    const hash = await this.getFileHash(filePath);
-                    this.files.push({ name: file.name, filePath, time: moment(time), hash });
+                    this.files.push({ name: file.name, filePath });
+                    MagicLog.echo(`Loading files... Count: ${this.files.length}`);
                 }
             }
         }
+        MagicLog.newline();
     }
+
+    public async getFilesStat() {
+        console.log('Get info...');
+        for (let i = 0; i < this.files.length; i++) {
+            const file = this.files[i];
+            const filePath = file.filePath;
+            const time = await this.getDate(filePath);
+            const hash = await this.getFileHash(filePath);
+            Object.assign(file, { time: moment(time), hash });
+            MagicLog.echo(`progress: ${i}/${this.files.length}\t Getting info from ${file.name}`);
+        }
+        MagicLog.newline();
+    }
+
     public async getDate(filePath: string) {
         const { atime, mtime, ctime, birthtime } = await fsPromises.stat(filePath);
         // console.log(filePath);
@@ -148,6 +174,7 @@ export class Pico {
                 return birthtime;
         }
     }
+
     public getFileHash(filePath: string): Promise<string> {
         return new Promise((resolve, reject) => {
             const hash = crypto.createHash('SHA256');
@@ -160,4 +187,5 @@ export class Pico {
             });
         });
     }
+
 }

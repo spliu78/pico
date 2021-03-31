@@ -45,6 +45,7 @@ var promises_1 = __importDefault(require("fs/promises"));
 var path_1 = __importDefault(require("path"));
 var crypto_1 = __importDefault(require("crypto"));
 var moment_1 = __importDefault(require("moment"));
+var util_1 = require("./util");
 var picExt = ['.gif', '.jpeg', '.jpg', '.png'];
 var ClassifyWay;
 (function (ClassifyWay) {
@@ -89,17 +90,22 @@ var Pico = /** @class */ (function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0: 
-                    // get files
+                    // get files list
                     return [4 /*yield*/, this.getFiles(this.inputDir)];
                     case 1:
-                        // get files
+                        // get files list
+                        _a.sent();
+                        // get files stat
+                        return [4 /*yield*/, this.getFilesStat()];
+                    case 2:
+                        // get files stat
                         _a.sent();
                         // for (const file of this.files) {
                         //     console.log(JSON.stringify(file, null, 2));
                         // }
                         // classify
                         return [4 /*yield*/, this.classify()];
-                    case 2:
+                    case 3:
                         // for (const file of this.files) {
                         //     console.log(JSON.stringify(file, null, 2));
                         // }
@@ -113,56 +119,60 @@ var Pico = /** @class */ (function () {
     };
     Pico.prototype.classify = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var fileSet, _i, _a, file, dirName, dirPath, e_1, e_2;
-            return __generator(this, function (_b) {
-                switch (_b.label) {
+            var fileSet, i, file, dirName, dirPath, e_1, e_2;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
+                        console.log('Classify...');
                         fileSet = new Set();
-                        _i = 0, _a = this.files;
-                        _b.label = 1;
+                        i = 0;
+                        _a.label = 1;
                     case 1:
-                        if (!(_i < _a.length)) return [3 /*break*/, 11];
-                        file = _a[_i];
+                        if (!(i < this.files.length)) return [3 /*break*/, 11];
+                        file = this.files[i];
+                        util_1.MagicLog.echo("progress: " + i + "/" + this.files.length + "\t Classify " + file.name);
+                        if (!file.time || !file.hash)
+                            return [3 /*break*/, 10];
                         if (fileSet.has(file.hash)) {
                             this.handleRepeatFile(file);
-                            return [2 /*return*/];
+                            return [3 /*break*/, 10];
                         }
                         fileSet.add(file.hash);
                         dirName = file.time.format('YYYY-MM-DD');
                         dirPath = path_1.default.join(this.outputDir, dirName);
-                        console.log(file.filePath + " will be copy to " + dirPath);
                         if (!(this.option.mode === ClassifyWay.copy || this.option.mode === ClassifyWay.cut)) return [3 /*break*/, 10];
                         return [4 /*yield*/, this.createDirIfNotExist(dirPath)];
                     case 2:
-                        _b.sent();
-                        _b.label = 3;
+                        _a.sent();
+                        _a.label = 3;
                     case 3:
-                        _b.trys.push([3, 9, , 10]);
+                        _a.trys.push([3, 9, , 10]);
                         return [4 /*yield*/, promises_1.default.copyFile(file.filePath, path_1.default.join(dirPath, file.name), this.option.override ? undefined : fs_1.default.constants.COPYFILE_EXCL)];
                     case 4:
-                        _b.sent();
+                        _a.sent();
                         if (!(this.option.mode === ClassifyWay.cut)) return [3 /*break*/, 8];
-                        _b.label = 5;
+                        _a.label = 5;
                     case 5:
-                        _b.trys.push([5, 7, , 8]);
-                        console.log(file.filePath + " will be delete!");
+                        _a.trys.push([5, 7, , 8]);
+                        // console.log(`${file.filePath} will be delete!`);
                         return [4 /*yield*/, promises_1.default.rm(file.filePath)];
                     case 6:
-                        _b.sent();
+                        // console.log(`${file.filePath} will be delete!`);
+                        _a.sent();
                         return [3 /*break*/, 8];
                     case 7:
-                        e_1 = _b.sent();
-                        console.log(file.filePath + " delete failed!");
+                        e_1 = _a.sent();
                         return [3 /*break*/, 8];
                     case 8: return [3 /*break*/, 10];
                     case 9:
-                        e_2 = _b.sent();
-                        console.log(file.filePath + " copy failed!");
+                        e_2 = _a.sent();
                         return [3 /*break*/, 10];
                     case 10:
-                        _i++;
+                        i++;
                         return [3 /*break*/, 1];
-                    case 11: return [2 /*return*/];
+                    case 11:
+                        util_1.MagicLog.newline();
+                        return [2 /*return*/];
                 }
             });
         });
@@ -194,42 +204,75 @@ var Pico = /** @class */ (function () {
         });
     };
     Pico.prototype.handleRepeatFile = function (file) {
-        console.log(file.name + " hash repeat, skip");
+        // console.log(`${file.name} hash repeat, skip`);
     };
     Pico.prototype.getFiles = function (dirPath) {
         return __awaiter(this, void 0, void 0, function () {
-            var files, _i, files_1, file, filePath, time, hash;
+            var files, _i, files_1, file, filePath;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, promises_1.default.readdir(dirPath, { withFileTypes: true })];
+                    case 0:
+                        util_1.MagicLog.echo('Loading files... ');
+                        return [4 /*yield*/, promises_1.default.readdir(dirPath, { withFileTypes: true })];
                     case 1:
                         files = _a.sent();
                         _i = 0, files_1 = files;
                         _a.label = 2;
                     case 2:
-                        if (!(_i < files_1.length)) return [3 /*break*/, 8];
+                        if (!(_i < files_1.length)) return [3 /*break*/, 6];
                         file = files_1[_i];
                         filePath = path_1.default.join(dirPath, file.name);
                         if (!(file.isDirectory() && this.option.recursive)) return [3 /*break*/, 4];
                         return [4 /*yield*/, this.getFiles(filePath)];
                     case 3:
                         _a.sent();
-                        return [3 /*break*/, 7];
+                        return [3 /*break*/, 5];
                     case 4:
-                        if (!file.isFile()) return [3 /*break*/, 7];
-                        if (!(!this.ext.length || this.ext.includes(path_1.default.extname(file.name).toLowerCase()))) return [3 /*break*/, 7];
-                        return [4 /*yield*/, this.getDate(filePath)];
+                        if (file.isFile()) {
+                            if (!this.ext.length || this.ext.includes(path_1.default.extname(file.name).toLowerCase())) {
+                                this.files.push({ name: file.name, filePath: filePath });
+                                util_1.MagicLog.echo("Loading files... Count: " + this.files.length);
+                            }
+                        }
+                        _a.label = 5;
                     case 5:
-                        time = _a.sent();
-                        return [4 /*yield*/, this.getFileHash(filePath)];
-                    case 6:
-                        hash = _a.sent();
-                        this.files.push({ name: file.name, filePath: filePath, time: moment_1.default(time), hash: hash });
-                        _a.label = 7;
-                    case 7:
                         _i++;
                         return [3 /*break*/, 2];
-                    case 8: return [2 /*return*/];
+                    case 6:
+                        util_1.MagicLog.newline();
+                        return [2 /*return*/];
+                }
+            });
+        });
+    };
+    Pico.prototype.getFilesStat = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var i, file, filePath, time, hash;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        console.log('Get info...');
+                        i = 0;
+                        _a.label = 1;
+                    case 1:
+                        if (!(i < this.files.length)) return [3 /*break*/, 5];
+                        file = this.files[i];
+                        filePath = file.filePath;
+                        return [4 /*yield*/, this.getDate(filePath)];
+                    case 2:
+                        time = _a.sent();
+                        return [4 /*yield*/, this.getFileHash(filePath)];
+                    case 3:
+                        hash = _a.sent();
+                        Object.assign(file, { time: moment_1.default(time), hash: hash });
+                        util_1.MagicLog.echo("progress: " + i + "/" + this.files.length + "\t Getting info from " + file.name);
+                        _a.label = 4;
+                    case 4:
+                        i++;
+                        return [3 /*break*/, 1];
+                    case 5:
+                        util_1.MagicLog.newline();
+                        return [2 /*return*/];
                 }
             });
         });

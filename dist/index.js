@@ -73,7 +73,6 @@ copyCommand.action(function (options) { return __awaiter(void 0, void 0, void 0,
             case 0:
                 picOpt = optionsHandler(options);
                 picOpt.mode = Pico_1.ClassifyWay.copy;
-                console.log(picOpt);
                 p = new Pico_1.Pico(options.from, options.to, picOpt);
                 return [4 /*yield*/, p.process()];
             case 1:
@@ -89,7 +88,6 @@ cutCommand.action(function (options) { return __awaiter(void 0, void 0, void 0, 
             case 0:
                 picOpt = optionsHandler(options);
                 picOpt.mode = Pico_1.ClassifyWay.cut;
-                console.log(picOpt);
                 p = new Pico_1.Pico(options.from, options.to, picOpt);
                 return [4 /*yield*/, p.process()];
             case 1:
@@ -105,7 +103,6 @@ testCommand.action(function (options) { return __awaiter(void 0, void 0, void 0,
             case 0:
                 picOpt = optionsHandler(options);
                 picOpt.mode = Pico_1.ClassifyWay.test;
-                console.log(picOpt);
                 p = new Pico_1.Pico(options.from, options.to, picOpt);
                 return [4 /*yield*/, p.process()];
             case 1:
@@ -115,4 +112,10 @@ testCommand.action(function (options) { return __awaiter(void 0, void 0, void 0,
     });
 }); });
 program.parse();
+// (async () => {
+// const picOpt: PicoOption = {};
+// picOpt.mode = ClassifyWay.test;
+// const p = new Pico('.', './test', picOpt);
+// await p.process();
+// })();
 //# sourceMappingURL=index.js.map
