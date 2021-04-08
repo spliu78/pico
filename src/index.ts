@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import commander, { Command, Option } from 'commander';
-import { Pico, FileTimeMode, ClassifyWay, Option as PicoOption } from './Pico';
+import { Pico } from './Pico';
+import { ClassifyWay } from './types/enum';
 
 const program = new Command();
 program.version('0.0.1');

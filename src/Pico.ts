@@ -1,64 +1,28 @@
-import crypto from 'crypto';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import moment from 'moment';
-import EventEmitter from 'events';
 import { PathLike } from 'fs';
 import path from 'path';
 import { MagicLog } from './util';
 import { StatWorkers } from './StatWorker';
+import { ClassifyWay, ExecStatusString, FileTimeMode } from './types/enum';
 const picExt = ['.gif', '.jpeg', '.jpg', '.png'];
 
-export enum ClassifyWay {
-    cut, copy, test
-}
-
-export enum FileTimeMode {
-    access = 'access',
-    create = 'create',
-    modify = 'modify',
-    birth = 'birth'
-}
-
-export interface Option {
-    mode?: ClassifyWay,
-    timeMode?: FileTimeMode,
-    recursive?: boolean,
-    override?: boolean,
-    extnames?: [string],
-    picOnly?: boolean
-}
-
-interface File {
-    filePath: string,
-    name: string,
-    time?: moment.Moment,
-    hash?: string
-}
-
-export interface Pico {
-    on(event: 'getFile', callback: () => void): this;
-}
-
-
-export class Pico extends EventEmitter {
+export class Pico {
     inputDir: string;
     outputDir: string;
     ext: Array<string> = [];
-    option: Option = {
+    option: PicoOption = {
         mode: ClassifyWay.test,
         timeMode: FileTimeMode.birth,
         recursive: false,
         picOnly: false,
         override: false
     };
-    files: Array<File> = [];
-    logSuffix = `${moment().format('YYYYMMDD_HHmmss')}.log`;
-    // Log Part1: Hash-File tree
-    // Part2: Date-File tree
-    // Part3: classify error, override log
-    constructor(inputDir: string, outputDir: string, option?: Option) {
-        super();
+    files: Array<PicoFile> = [];
+    picoDataDir = `Pico_${moment().format('YYYYMMDD_HHmmss')}`;
+
+    constructor(inputDir: string, outputDir: string, option?: PicoOption) {
         this.inputDir = inputDir;
         this.outputDir = outputDir;
         if (inputDir === outputDir) {
@@ -89,47 +53,81 @@ export class Pico extends EventEmitter {
         StatWorkers.destroy();
     }
 
-    private createHashFileLog() {
-
-    }
-
     // 单线程 faster than promise
     private async classify() {
         console.log('Classify...');
-        console.time('classify');
+        console.time('Classify');
         const fileHashMap = new Map();
         const destNameSet = new Set();
         const dirSet = new Set();
+        const execArr: Array<ExecType> = [];
         // classify by date
         for (let i = 0; i < this.files.length; i++) {
             const file = this.files[i];
-            await MagicLog.echo(`progress: ${i}/${this.files.length} Classify ${file.name}`);
+            await MagicLog.echo(`Classify: ${i}/${this.files.length} Classify ${file.name}`);
             if (!file.time || !file.hash) continue;
             if (!fileHashMap.has(file.hash)) {
                 fileHashMap.set(file.hash, [file]);
                 const dirName = file.time.format('YYYY-MM-DD');
                 const dirPath = path.join(this.outputDir, dirName);
+
                 // 同名但hash不同的文件，后者缀上hash值后八位
                 let destFile = path.join(dirPath, file.name);
                 if (!destNameSet.has(destFile)) {
                     destNameSet.add(destFile);
                 } else {
-                    // name = 'file_len8hash.xxx'
+                    // rewrite name = 'file_len8hash.xxx'
                     const name = path.basename(destFile, path.extname(destFile)) + '_' + file.hash.slice(file.hash.length - 8) + path.extname(destFile);
                     destFile = path.join(path.dirname(destFile), name);
                     destNameSet.add(destFile);
                 }
+                let status: ExecStatusString = 'create';
+
                 if (this.option.mode === ClassifyWay.copy) {
                     !dirSet.has(dirPath) && await this.createDirIfNotExist(dirPath) && dirSet.add(dirPath);
-                    await fsPromises.copyFile(file.filePath, destFile, this.option.override ? undefined : fs.constants.COPYFILE_EXCL);
+                    try {
+                        await fsPromises.copyFile(file.filePath, destFile, this.option.override ? undefined : fs.constants.COPYFILE_EXCL);
+                    } catch (e) {
+                        status = 'conflict';
+                    }
                 }
+                execArr.push({ file, status, destName: path.basename(destFile), destDir: path.dirname(destFile) });
             } else {
-                fileHashMap.set(file.hash, fileHashMap.get(file.hash).push(file));
+                const fileArr = fileHashMap.get(file.hash) || new Array<File>();
+                fileArr.push(file);
+                fileHashMap.set(file.hash, fileArr);
+                execArr.push({ file, status: 'hashRepeat' });
             }
         }
-        await MagicLog.echo(`progress: ${this.files.length}/${this.files.length}`);
+        await MagicLog.echo(`Classify: ${this.files.length}/${this.files.length}`);
         MagicLog.newline();
-        console.timeEnd('classify');
+        console.timeEnd('Classify');
+        await this.genPicoData(fileHashMap, execArr);
+    }
+
+    private async genPicoData(
+        fileHashMap: Map<string, Array<PicoFile>>,
+        execArr: Array<ExecType>,
+    ) {
+        const picoPath = path.join(this.outputDir, this.picoDataDir);
+        await this.createDirIfNotExist(picoPath);
+        // File-Hash Data
+        // path \t repeatCount \t hash
+        let fileHashData = '';
+        fileHashMap.forEach((fileArr) => {
+            fileArr.forEach((file, _index, arr) => {
+                fileHashData += `${file.filePath}\t${arr.length}\t${file.hash}\n`;
+            });
+        });
+        await fsPromises.writeFile(path.join(picoPath, 'File-Hash.data'), fileHashData);
+
+        // Dir-File Data
+        // fileName \t status (hashRepeat/created/conflict) \t newFileName(when rename) | null \t from \t to | null(when skip) 
+        let dirFileData = '';
+        execArr.forEach(({ file, status, destDir = '', destName = '' }) => {
+            dirFileData += `${file.name}\t${status}\t${(destName && destName === file.name) ? '' : destName}\t${file.filePath}\t${destDir}\n`;
+        });
+        await fsPromises.writeFile(path.join(picoPath, 'Dir-File.data'), dirFileData);
     }
 
     private async createDirIfNotExist(dirPath: PathLike) {
@@ -164,7 +162,7 @@ export class Pico extends EventEmitter {
     // 线程模式 fastest!
     private async getFilesStat() {
         console.log('Get info...');
-        console.time('getFilesStat');
+        console.time('Get info');
         const pArr: Promise<void>[] = [];
         let index = 0;
         this.files.forEach(file => {
@@ -177,7 +175,7 @@ export class Pico extends EventEmitter {
         await Promise.all(pArr);
         await MagicLog.echo(`progress: ${this.files.length}/${this.files.length}`);
         MagicLog.newline();
-        console.timeEnd('getFilesStat');
+        console.timeEnd('Get info');
     }
 
     public async getDate(filePath: string) {

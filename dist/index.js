@@ -3,6 +3,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const commander_1 = require("commander");
 const Pico_1 = require("./Pico");
+const enum_1 = require("./types/enum");
 const program = new commander_1.Command();
 program.version('0.0.1');
 // pico copy -f <from> -t <to> -r -o -e a,b,c -p
@@ -32,13 +33,13 @@ const optionsHandler = (options) => {
 };
 copyCommand.action(async (options) => {
     const picOpt = optionsHandler(options);
-    picOpt.mode = Pico_1.ClassifyWay.copy;
+    picOpt.mode = enum_1.ClassifyWay.copy;
     const p = new Pico_1.Pico(options.from, options.to, picOpt);
     await p.process();
 });
 testCommand.action(async (options) => {
     const picOpt = optionsHandler(options);
-    picOpt.mode = Pico_1.ClassifyWay.test;
+    picOpt.mode = enum_1.ClassifyWay.test;
     const p = new Pico_1.Pico(options.from, options.to, picOpt);
     await p.process();
 });
