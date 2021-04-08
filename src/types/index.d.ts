@@ -1,8 +1,6 @@
-
-
 declare interface PicoOption {
-    mode?: ClassifyWay,
-    timeMode?: FileTimeMode,
+    mode?: import('./enum').ClassifyWay,
+    timeMode?: import('./enum').FileTimeModeString,
     recursive?: boolean,
     override?: boolean,
     extnames?: [string],
@@ -16,10 +14,9 @@ declare interface PicoFile {
     time?: moment.Moment
 }
 
-
 declare interface ExecType {
     file: PicoFile,
-    status: ExecStatusString,
+    status: import('./enum').ExecStatusString,
     destName?: string,
     destDir?: string
 }

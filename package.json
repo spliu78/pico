@@ -1,16 +1,15 @@
 {
-    "name": "pico",
-    "version": "1.0.0",
+    "name": "pico-pic",
+    "version": "1.0.1",
     "description": "提供文件夹地址，整理其中照片归档：读取修改日期、MD5进行自动归档",
     "main": "index.js",
     "bin": {
-        "pico": "./dist/index.js"
+        "pico": "./dist/cli.js"
     },
     "scripts": {
         "start": "tsc && node ./dist/index.js",
-        "build": "tsc && npm link",
-        "test": "rm ./to -rf && tsc && node ./dist/index.js copy -f ./from -t ./to -r ",
-        "test-tilly": "tsc && node ./dist/Tilly.js"
+        "build": "tsc && npm link --force",
+        "test": "rm ./to -rf && tsc && node ./dist/cli.js copy -f ./from -t ./to -r "
     },
     "keywords": [],
     "author": "",

@@ -5,7 +5,7 @@ import { PathLike } from 'fs';
 import path from 'path';
 import { MagicLog } from './util';
 import { StatWorkers } from './StatWorker';
-import { ClassifyWay, ExecStatusString, FileTimeMode } from './types/enum';
+import { ClassifyWay, ExecStatusString, FileTimeMode, FileTimeModeString } from './types/enum';
 const picExt = ['.gif', '.jpeg', '.jpg', '.png'];
 
 export class Pico {
@@ -192,7 +192,7 @@ export class Pico {
             case FileTimeMode.birth:
                 return birthtime;
             default:
-                return birthtime;
+                return mtime;
         }
     }
 
