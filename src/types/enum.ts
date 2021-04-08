@@ -2,6 +2,15 @@ export enum ClassifyWay {
     cut, copy, test
 }
 
+export enum FileTimeMode {
+    access = 'access',
+    create = 'create',
+    modify = 'modify',
+    birth = 'birth'
+}
+
+export type FileTimeModeString = keyof typeof FileTimeMode;
+
 export enum ExecStatus {
     hashRepeat,
     create,
@@ -10,9 +19,3 @@ export enum ExecStatus {
 
 export type ExecStatusString = keyof typeof ExecStatus;
 
-export enum FileTimeMode {
-    access = 'access',
-    create = 'create',
-    modify = 'modify',
-    birth = 'birth'
-}

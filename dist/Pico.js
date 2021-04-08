@@ -120,7 +120,6 @@ class Pico {
         // Dir-File Data
         // fileName \t status (hashRepeat/created/conflict) \t newFileName(when rename) | null \t from \t to | null(when skip) 
         let dirFileData = '';
-        console.log(JSON.stringify(execArr, null, 2));
         execArr.forEach(({ file, status, destDir = '', destName = '' }) => {
             dirFileData += `${file.name}\t${status}\t${(destName && destName === file.name) ? '' : destName}\t${file.filePath}\t${destDir}\n`;
         });
@@ -187,7 +186,7 @@ class Pico {
             case enum_1.FileTimeMode.birth:
                 return birthtime;
             default:
-                return birthtime;
+                return mtime;
         }
     }
 }
