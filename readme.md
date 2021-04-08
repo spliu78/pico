@@ -20,8 +20,17 @@
 ## Feature
 
 - 多线程进行Hash操作
+- 命令执行完毕后，在目标目录中生成操作详录：
+  - `Pico_{DATE}_{TIME}/Dir-File.data`
+    记录文件目录至目录的操作  
+    格式：`fileName \t status \t newFileName \t fromPath \t toPath`  
+    status: hashRepeat | created | conflict  
+    newFileName: null | name(when rename)  
+    toPath: null | filePath(when copy)  
+  - `Pico_{DATE}_{TIME}/File-Hash.data`
+    记录from文件夹中文件的hash值，以及重复数  
+    格式：`path \t repeatCount \t hash`
 
 ## TODO
 
-[-] 导出重复文件list，放到需要导出的文件夹下，附上path信息  
 [-] 终极目标：实现桌面UI，实现album功能
