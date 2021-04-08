@@ -9,7 +9,8 @@
     "scripts": {
         "start": "tsc && node ./dist/index.js",
         "build": "tsc && npm link",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "rm ./to -rf && tsc && node ./dist/index.js copy -f ./from -t ./to -r ",
+        "test-tilly": "tsc && node ./dist/Tilly.js"
     },
     "keywords": [],
     "author": "",
@@ -18,7 +19,9 @@
         "commander": "^7.2.0",
         "dayjs": "^1.10.4",
         "moment": "^2.29.1",
-        "ora": "^5.4.0"
+        "node-worker-threads-pool": "^1.4.3",
+        "ora": "^5.4.0",
+        "term-size": "^2.2.1"
     },
     "devDependencies": {
         "@types/commander": "^2.12.2",

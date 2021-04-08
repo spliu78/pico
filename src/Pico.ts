@@ -1,10 +1,12 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
 import moment from 'moment';
-import { PathLike } from 'node:fs';
+import EventEmitter from 'events';
+import { PathLike } from 'fs';
+import path from 'path';
 import { MagicLog } from './util';
+import { StatWorkers } from './StatWorker';
 const picExt = ['.gif', '.jpeg', '.jpg', '.png'];
 
 export enum ClassifyWay {
@@ -34,7 +36,12 @@ interface File {
     hash?: string
 }
 
-export class Pico {
+export interface Pico {
+    on(event: 'getFile', callback: () => void): this;
+}
+
+
+export class Pico extends EventEmitter {
     inputDir: string;
     outputDir: string;
     ext: Array<string> = [];
@@ -45,10 +52,13 @@ export class Pico {
         picOnly: false,
         override: false
     };
-
     files: Array<File> = [];
-
+    logSuffix = `${moment().format('YYYYMMDD_HHmmss')}.log`;
+    // Log Part1: Hash-File tree
+    // Part2: Date-File tree
+    // Part3: classify error, override log
     constructor(inputDir: string, outputDir: string, option?: Option) {
+        super();
         this.inputDir = inputDir;
         this.outputDir = outputDir;
         if (inputDir === outputDir) {
@@ -61,6 +71,7 @@ export class Pico {
         if (this.option?.extnames) {
             this.ext = this.ext.concat(this.option.extnames);
         }
+        StatWorkers.init();
     }
 
     public async process() {
@@ -68,93 +79,105 @@ export class Pico {
         await this.getFiles(this.inputDir);
         // get files stat
         await this.getFilesStat();
-        // for (const file of this.files) {
-        //     console.log(JSON.stringify(file, null, 2));
-        // }
         // classify
         await this.classify();
         console.log('Job Done!');
+        this.destroy();
     }
 
-    public async classify() {
+    private destroy() {
+        StatWorkers.destroy();
+    }
+
+    private createHashFileLog() {
+
+    }
+
+    // 单线程 faster than promise
+    private async classify() {
         console.log('Classify...');
-        const fileSet = new Set();
+        console.time('classify');
+        const fileHashMap = new Map();
+        const destNameSet = new Set();
+        const dirSet = new Set();
         // classify by date
         for (let i = 0; i < this.files.length; i++) {
             const file = this.files[i];
-            MagicLog.echo(`progress: ${i}/${this.files.length}\t Classify ${file.name}`);
+            await MagicLog.echo(`progress: ${i}/${this.files.length} Classify ${file.name}`);
             if (!file.time || !file.hash) continue;
-            if (fileSet.has(file.hash)) {
-                this.handleRepeatFile(file);
-                continue;
-            }
-            fileSet.add(file.hash);
-            const dirName = file.time.format('YYYY-MM-DD');
-            const dirPath = path.join(this.outputDir, dirName);
-            // console.log(`${file.filePath} will be copy to ${dirPath}`);
-            if (this.option.mode === ClassifyWay.copy || this.option.mode === ClassifyWay.cut) {
-                await this.createDirIfNotExist(dirPath);
-                try {
-                    await fsPromises.copyFile(file.filePath, path.join(dirPath, file.name), this.option.override ? undefined : fs.constants.COPYFILE_EXCL);
-                    if (this.option.mode === ClassifyWay.cut) {
-                        try {
-                            // console.log(`${file.filePath} will be delete!`);
-                            await fsPromises.rm(file.filePath);
-                        } catch (e) {
-                            // console.log(`${file.filePath} delete failed!`);
-                        }
-                    }
-                } catch (e) {
-                    // console.log(`${file.filePath} copy failed!`);
+            if (!fileHashMap.has(file.hash)) {
+                fileHashMap.set(file.hash, [file]);
+                const dirName = file.time.format('YYYY-MM-DD');
+                const dirPath = path.join(this.outputDir, dirName);
+                // 同名但hash不同的文件，后者缀上hash值后八位
+                let destFile = path.join(dirPath, file.name);
+                if (!destNameSet.has(destFile)) {
+                    destNameSet.add(destFile);
+                } else {
+                    // name = 'file_len8hash.xxx'
+                    const name = path.basename(destFile, path.extname(destFile)) + '_' + file.hash.slice(file.hash.length - 8) + path.extname(destFile);
+                    destFile = path.join(path.dirname(destFile), name);
+                    destNameSet.add(destFile);
                 }
+                if (this.option.mode === ClassifyWay.copy) {
+                    !dirSet.has(dirPath) && await this.createDirIfNotExist(dirPath) && dirSet.add(dirPath);
+                    await fsPromises.copyFile(file.filePath, destFile, this.option.override ? undefined : fs.constants.COPYFILE_EXCL);
+                }
+            } else {
+                fileHashMap.set(file.hash, fileHashMap.get(file.hash).push(file));
             }
         }
+        await MagicLog.echo(`progress: ${this.files.length}/${this.files.length}`);
         MagicLog.newline();
+        console.timeEnd('classify');
     }
 
-    public async createDirIfNotExist(dirPath: PathLike) {
+    private async createDirIfNotExist(dirPath: PathLike) {
         let dirStat;
         try {
             dirStat = await fsPromises.stat(dirPath);
         } catch (e) { }
         if (!(dirStat?.isDirectory())) {
-            console.log(`Dir ${dirPath} is not exist, will be created.`);
             await fsPromises.mkdir(dirPath, { recursive: true });
+            return false
         }
+        return true;
     }
 
-    public handleRepeatFile(file: File) {
-        // console.log(`${file.name} hash repeat, skip`);
-    }
-
-    public async getFiles(dirPath: string) {
-        MagicLog.echo('Loading files... ');
+    private async getFiles(dirPath: string, recursive = false) {
+        !recursive && await MagicLog.echo('Loading files... ');
         const files = await fsPromises.readdir(dirPath, { withFileTypes: true });
         for (const file of files) {
             const filePath = path.join(dirPath, file.name);
             if (file.isDirectory() && this.option.recursive) {
-                await this.getFiles(filePath);
+                await this.getFiles(filePath, true);
             } else if (file.isFile()) {
                 if (!this.ext.length || this.ext.includes(path.extname(file.name).toLowerCase())) {
                     this.files.push({ name: file.name, filePath });
-                    MagicLog.echo(`Loading files... Count: ${this.files.length}`);
+                    await MagicLog.echo(`Loading files... Count: ${this.files.length}`);
                 }
             }
         }
-        MagicLog.newline();
+        !recursive && MagicLog.newline();
     }
 
-    public async getFilesStat() {
+    // 线程模式 fastest!
+    private async getFilesStat() {
         console.log('Get info...');
-        for (let i = 0; i < this.files.length; i++) {
-            const file = this.files[i];
-            const filePath = file.filePath;
-            const time = await this.getDate(filePath);
-            const hash = await this.getFileHash(filePath);
-            Object.assign(file, { time: moment(time), hash });
-            MagicLog.echo(`progress: ${i}/${this.files.length}\t Getting info from ${file.name}`);
-        }
+        console.time('getFilesStat');
+        const pArr: Promise<void>[] = [];
+        let index = 0;
+        this.files.forEach(file => {
+            pArr.push(this.getDate(file.filePath).then(time => { Object.assign(file, { time: moment(time) }) }));
+            pArr.push(StatWorkers.exec(file.filePath).then(async hash => {
+                Object.assign(file, { hash });
+                await MagicLog.echo(`progress: ${++index}/${this.files.length}`);
+            }));
+        });
+        await Promise.all(pArr);
+        await MagicLog.echo(`progress: ${this.files.length}/${this.files.length}`);
         MagicLog.newline();
+        console.timeEnd('getFilesStat');
     }
 
     public async getDate(filePath: string) {
@@ -173,19 +196,6 @@ export class Pico {
             default:
                 return birthtime;
         }
-    }
-
-    public getFileHash(filePath: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const hash = crypto.createHash('SHA256');
-            const stream = fs.createReadStream(filePath);
-            stream.on('data', function (chunk) {
-                hash.update(chunk);
-            });
-            stream.on('end', () => {
-                resolve(hash.digest('hex'));
-            });
-        });
     }
 
 }
