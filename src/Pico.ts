@@ -1,11 +1,11 @@
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import moment from 'moment';
-import { PathLike } from 'fs';
 import path from 'path';
-import { MagicLog } from './util';
+import { MagicLog, createDirIfNotExist } from './util';
 import { StatWorkers } from './StatWorker';
 import { ClassifyWay, ExecStatusString, FileTimeMode, FileTimeModeString } from './types/enum';
+import PicoData from './PicoData';
 const picExt = ['.gif', '.jpeg', '.jpg', '.png'];
 
 export class Pico {
@@ -20,14 +20,14 @@ export class Pico {
         override: false
     };
     files: Array<PicoFile> = [];
-    picoDataDir = `Pico_${moment().format('YYYYMMDD_HHmmss')}`;
+    picoData: PicoData;
 
     constructor(inputDir: string, outputDir: string, option?: PicoOption) {
-        this.inputDir = inputDir;
-        this.outputDir = outputDir;
         if (inputDir === outputDir) {
             throw new Error('inputDir & outputDir is not supposed same.');
         }
+        this.inputDir = path.resolve(inputDir);
+        this.outputDir = path.resolve(outputDir);
         option && (this.option = Object.assign(this.option, option));
         if (this.option.picOnly) {
             this.ext = picExt;
@@ -35,10 +35,17 @@ export class Pico {
         if (this.option?.extnames) {
             this.ext = this.ext.concat(this.option.extnames);
         }
+        this.picoData = new PicoData(outputDir);
+    }
+
+    private async init() {
+        console.log('init...');
         StatWorkers.init();
+        await this.picoData.init();
     }
 
     public async process() {
+        await this.init();
         // get files list
         await this.getFiles(this.inputDir);
         // get files stat
@@ -57,7 +64,7 @@ export class Pico {
     private async classify() {
         console.log('Classify...');
         console.time('Classify');
-        const fileHashMap = new Map();
+        const fileHashMap = this.picoData.hashMap;
         const destNameSet = new Set();
         const dirSet = new Set();
         const execArr: Array<ExecType> = [];
@@ -84,7 +91,7 @@ export class Pico {
                 let status: ExecStatusString = 'create';
 
                 if (this.option.mode === ClassifyWay.copy) {
-                    !dirSet.has(dirPath) && await this.createDirIfNotExist(dirPath) && dirSet.add(dirPath);
+                    !dirSet.has(dirPath) && await createDirIfNotExist(dirPath) && dirSet.add(dirPath);
                     try {
                         await fsPromises.copyFile(file.filePath, destFile, this.option.override ? undefined : fs.constants.COPYFILE_EXCL);
                     } catch (e) {
@@ -93,7 +100,7 @@ export class Pico {
                 }
                 execArr.push({ file, status, destName: path.basename(destFile), destDir: path.dirname(destFile) });
             } else {
-                const fileArr = fileHashMap.get(file.hash) || new Array<File>();
+                const fileArr = fileHashMap.get(file.hash) || new Array<PicoFile>();
                 fileArr.push(file);
                 fileHashMap.set(file.hash, fileArr);
                 execArr.push({ file, status: 'hashRepeat' });
@@ -102,44 +109,7 @@ export class Pico {
         await MagicLog.echo(`Classify: ${this.files.length}/${this.files.length}`);
         MagicLog.newline();
         console.timeEnd('Classify');
-        await this.genPicoData(fileHashMap, execArr);
-    }
-
-    private async genPicoData(
-        fileHashMap: Map<string, Array<PicoFile>>,
-        execArr: Array<ExecType>,
-    ) {
-        const picoPath = path.join(this.outputDir, this.picoDataDir);
-        await this.createDirIfNotExist(picoPath);
-        // File-Hash Data
-        // path \t repeatCount \t hash
-        let fileHashData = '';
-        fileHashMap.forEach((fileArr) => {
-            fileArr.forEach((file, _index, arr) => {
-                fileHashData += `${file.filePath}\t${arr.length}\t${file.hash}\n`;
-            });
-        });
-        await fsPromises.writeFile(path.join(picoPath, 'File-Hash.data'), fileHashData);
-
-        // Dir-File Data
-        // fileName \t status (hashRepeat/created/conflict) \t newFileName(when rename) | null \t from \t to | null(when skip) 
-        let dirFileData = '';
-        execArr.forEach(({ file, status, destDir = '', destName = '' }) => {
-            dirFileData += `${file.name}\t${status}\t${(destName && destName === file.name) ? '' : destName}\t${file.filePath}\t${destDir}\n`;
-        });
-        await fsPromises.writeFile(path.join(picoPath, 'Dir-File.data'), dirFileData);
-    }
-
-    private async createDirIfNotExist(dirPath: PathLike) {
-        let dirStat;
-        try {
-            dirStat = await fsPromises.stat(dirPath);
-        } catch (e) { }
-        if (!(dirStat?.isDirectory())) {
-            await fsPromises.mkdir(dirPath, { recursive: true });
-            return false
-        }
-        return true;
+        await this.picoData.genPicoData(fileHashMap, execArr);
     }
 
     private async getFiles(dirPath: string, recursive = false) {
@@ -166,7 +136,13 @@ export class Pico {
         const pArr: Promise<void>[] = [];
         let index = 0;
         this.files.forEach(file => {
-            pArr.push(this.getDate(file.filePath).then(time => { Object.assign(file, { time: moment(time) }) }));
+            pArr.push(this.getDate(file.filePath)
+                .then(time => {
+                    Object.assign(file, {
+                        time: moment(time)
+                    })
+                })
+            );
             pArr.push(StatWorkers.exec(file.filePath).then(async hash => {
                 Object.assign(file, { hash });
                 await MagicLog.echo(`progress: ${++index}/${this.files.length}`);

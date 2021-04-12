@@ -21,15 +21,16 @@
 
 - 多线程进行Hash操作
 - 命令执行完毕后，在目标目录中生成操作详录：
-  - `Pico_{DATE}_{TIME}/Dir-File.data`
+  - `.pico/FileMove_${datetime}.data`
     记录文件目录至目录的操作  
     格式：`fileName \t status \t newFileName \t fromPath \t toPath`  
     status: hashRepeat | created | conflict  
     newFileName: null | name(when rename)  
     toPath: null | filePath(when copy)  
-  - `Pico_{DATE}_{TIME}/File-Hash.data`
-    记录from文件夹中文件的hash值，以及重复数  
+  - `.pico/File-Hash.data.${datetime}`
+    记录单次操作from文件夹中文件的hash值，以及重复数  
     格式：`path \t repeatCount \t hash`
+- 支持多次执行pico，往已有pico文件夹下添加数据  
 
 ## TODO
 
