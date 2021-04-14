@@ -8,7 +8,7 @@
 `git clone https://github.com/spliu78/pico.git`
 
 安装
-`cd pico && npm install && npm build`
+`cd pico && npm install && npm build` or `npm link`
 
 运行
 `pico --help`

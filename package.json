@@ -1,8 +1,8 @@
 {
     "name": "pico-pic",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "提供文件夹地址，整理其中照片归档：读取修改日期、MD5进行自动归档",
-    "main": "index.js",
+    "main": "./dist/index.js",
     "bin": {
         "pico": "./dist/cli.js"
     },
