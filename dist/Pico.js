@@ -75,7 +75,7 @@ class Pico {
             if (!fileHashMap.has(file.hash)) {
                 fileHashMap.set(file.hash, [file]);
                 const dirName = file.time.format('YYYY-MM-DD');
-                const dirPath = path_1.default.join(this.outputDir, dirName);
+                const dirPath = path_1.default.join(this.outputDir, './picos', dirName);
                 // 同名但hash不同的文件，后者缀上hash值后八位
                 let destFile = path_1.default.join(dirPath, file.name);
                 if (!destNameSet.has(destFile)) {
