@@ -4,10 +4,15 @@ import { Pico } from './Pico';
 import { ClassifyWay, FileTimeModeString } from './types/enum';
 
 const program = new Command();
-program.version('0.0.1');
+// program.version('0.0.1');
 // pico copy -f <from> -t <to> -r -o -e a,b,c -p
 const copyCommand = program.command('copy').description('copy files');
-const testCommand = program.command('test').description('test which file is choosen');
+const testCommand = program.command('test').description('test what files should copy');
+
+// pico coverage pathA pathB
+const coverageComand = program.command('analyse <pathA> <pathB>').description('analyse dir difference by file\'s name').action((a, b) => {
+    Pico.diffFiles(a, b);
+});
 
 [copyCommand, testCommand].forEach((command) => {
     command.requiredOption('-f, --from <dir-path>', 'input dir path');

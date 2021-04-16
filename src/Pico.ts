@@ -6,6 +6,7 @@ import { MagicLog, createDirIfNotExist } from './util';
 import { StatWorkers } from './StatWorker';
 import { ClassifyWay, ExecStatusString, FileTimeMode, FileTimeModeString } from './types/enum';
 import PicoData from './PicoData';
+import glob from 'glob';
 const picExt = ['.gif', '.jpeg', '.jpg', '.png'];
 
 export class Pico {
@@ -44,17 +45,6 @@ export class Pico {
         await this.picoData.init();
     }
 
-    public async process() {
-        await this.init();
-        // get files list
-        await this.getFiles(this.inputDir);
-        // get files stat
-        await this.getFilesStat();
-        // classify
-        await this.classify();
-        console.log('Job Done!');
-        this.destroy();
-    }
 
     private destroy() {
         StatWorkers.destroy();
@@ -113,7 +103,7 @@ export class Pico {
     }
 
     private async getFiles(dirPath: string, recursive = false) {
-        !recursive && await MagicLog.echo('Loading files... ');
+        !recursive && await MagicLog.echo(`Loading ${dirPath} files... `);
         const files = await fsPromises.readdir(dirPath, { withFileTypes: true });
         for (const file of files) {
             const filePath = path.join(dirPath, file.name);
@@ -154,7 +144,7 @@ export class Pico {
         console.timeEnd('Get info');
     }
 
-    public async getDate(filePath: string) {
+    private async getDate(filePath: string) {
         const { atime, mtime, ctime, birthtime } = await fsPromises.stat(filePath);
         // console.log(filePath);
         // console.log({ atime, mtime, ctime, birthtime });
@@ -172,4 +162,36 @@ export class Pico {
         }
     }
 
+    public async process() {
+        await this.init();
+        // get files list
+        await this.getFiles(this.inputDir);
+        // get files stat
+        await this.getFilesStat();
+        // classify
+        await this.classify();
+        console.log('Job Done!');
+        this.destroy();
+    }
+
+    public static diffFiles(a: string, b: string) {
+        const aPath = path.resolve(path.join(a, '**/*'));
+        const bPath = path.resolve(path.join(b, '**/*'));
+        const aArr = glob.sync(aPath).map(fullPath => path.basename(fullPath));
+        const bArr = glob.sync(bPath).map(fullPath => path.basename(fullPath));
+        console.log(`A: ${aPath}\nB: ${bPath}\n`);
+        // a file length: xxx, xxx in b, xxx not in b
+        const aVal = aArr.reduce(
+            (finalValue, filePath) => finalValue + (bArr.includes(filePath) ? 1 : 0)
+            , 0
+        );
+        const bVal = bArr.reduce(
+            (finalValue, filePath) => finalValue + (aArr.includes(filePath) ? 1 : 0)
+            , 0
+        );
+        console.log(`A: Files: ${aArr.length}`);
+        aArr.length && console.log(`${aVal} (${Math.floor((aVal / aArr.length * 100))}%) in B\n`)
+        console.log(`B: Files: ${bArr.length}`);
+        bArr.length && console.log(`${bVal} (${Math.floor((bVal / bArr.length * 100))}%) in A`);
+    }
 }
