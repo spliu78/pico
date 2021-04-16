@@ -5,10 +5,14 @@ const commander_1 = require("commander");
 const Pico_1 = require("./Pico");
 const enum_1 = require("./types/enum");
 const program = new commander_1.Command();
-program.version('0.0.1');
+// program.version('0.0.1');
 // pico copy -f <from> -t <to> -r -o -e a,b,c -p
 const copyCommand = program.command('copy').description('copy files');
-const testCommand = program.command('test').description('test which file is choosen');
+const testCommand = program.command('test').description('test what files should copy');
+// pico coverage pathA pathB
+const coverageComand = program.command('analyse <pathA> <pathB>').description('analyse dir difference by file\'s name').action((a, b) => {
+    Pico_1.Pico.diffFiles(a, b);
+});
 [copyCommand, testCommand].forEach((command) => {
     command.requiredOption('-f, --from <dir-path>', 'input dir path');
     command.requiredOption('-t, --to <dir-path>', 'output dir path');
